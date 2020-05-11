@@ -10,8 +10,8 @@ void main() {
 
     setUpAll(() 
     {
-       random = Random();
-       supervisor = IsolateSupervisor();
+      random = Random();
+      supervisor = IsolateSupervisor();
     });
 
     tearDownAll(() async 

@@ -14,18 +14,27 @@ class IsolateForceExitException implements IsolateException {}
 /// Thrown when the result type is not [IsolateResult].
 class IsolateReturnInvalidTypeException implements IsolateException {}
 
+/// 
+class IsolateEmptyTaskException implements IsolateException {}
+
+/// 
+class IsolateNotIdleException implements IsolateException {}
+
 /// Thrown when error [StackTrace] is too big to return from isolate.
 class IsolateTooBigStacktraceException implements IsolateException 
 {
   final Type type;
   final String message;
-  final String stackTrace;
   final String isolateName;
+  final String _stackTrace;
+
+  StackTrace get stackTrace => 
+    StackTrace.fromString(this._stackTrace);
 
   IsolateTooBigStacktraceException(this.isolateName, Error error) :
     this.type = error.runtimeType, 
     this.message = error.toString(), 
-    this.stackTrace = error.stackTrace.toString();
+    this._stackTrace = error.stackTrace.toString();
 
   @override
   String toString() => '$isolateName: <$type> $message\n$stackTrace';

@@ -6,33 +6,35 @@ class IsolateSchedule
   final _streamController = StreamController<IsolateResult>.broadcast();
 
   IsolateScheduleEntry<R, F> add<R, F>(
-    IsolateEntryPoint<F> function, List arguments)
+    _IsolateEntryPoint<F> function, List arguments, TaskPriority priority)
   {
-    final task = IsolateTask<F>(function, arguments);
+    final task = IsolateTask<F>(function, arguments, priority);
     final taskEntry = IsolateScheduleEntry(task, this._streamController.stream);
     
     return this._entries[task.capability] = taskEntry;
   }
 
   void addListener(Stream<IsolateResult> results) => 
-    results?.listen((value) => this.update(value));
+    results?.listen(this.update, onError: (_) {}, cancelOnError: true);
 
   void update(IsolateResult result) => this._streamController.add(result);
 
-  IsolateScheduleEntry attach(IsolateWrapper worker)
+  IsolateTask unfulfilled()
   {
-    if (worker == null) return null; 
+    final tasks = this._entries.values.map((entry) => entry._task).toList();
 
-    final task = this._entries.values
-      .firstWhere((entry) => entry.task.isAwaiting, orElse: () => null);
-
-    task?.attach(worker);
-    return task;
+    tasks.sort((a, b) => b.priority.index - a.priority.index);
+    return tasks.firstWhere((task) => task.isAwaiting, orElse: () => null);
   }
 
-  void reset() => this._entries.values
-    .where((item) => item.task.status == TaskStatus.processing)
-    .forEach((item) => item.task.status = TaskStatus.awaiting);
+  void reset()
+  {
+    this._entries.removeWhere((_, item) => item._task.isCompleted);
+
+    this._entries.values
+      .where((item) => item._task.isProcessing)
+      .forEach((item) => item._task.reset());
+  } 
 
   IsolateScheduleEntry operator [](IsolateTask task) => 
     this._entries[task.capability];
@@ -46,23 +48,19 @@ class IsolateSchedule
 
 class IsolateScheduleEntry<R, F>
 {
-  IsolateWrapper _worker;
-
-  final IsolateTask<F> task;
+  final IsolateTask<F> _task;
   final Stream<IsolateResult<R>> stream;
 
-  IsolateScheduleEntry(this.task, stream) :
-    this.stream = stream.where((value) => value.capability == task.capability);
+  IsolateScheduleEntry(this._task, stream) :
+    this.stream = stream.where((value) => value.capability == _task.capability);
 
-  void close() => this.task.close();
-
-  void attach(IsolateWrapper worker)
+  Future<IsolateResult<R>> single() async
   {
-    if (worker == null) return; 
+    final result = await this.stream.first;
+    this._task.close();
 
-    this.task.lock();
-    this._worker = worker;
+    return result;
   }
   
-  Stream<IsolateResult> execute() => this._worker.execute(this.task);
+  void close() => this._task.close();
 }

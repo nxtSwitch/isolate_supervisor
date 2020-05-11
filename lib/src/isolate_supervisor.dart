@@ -23,16 +23,15 @@ class IsolateSupervisor
 
   /// Returns a result of the execution of the [function] with passed arguments.
   Future<R> compute<R>(
-    IsolateEntryPoint<FutureOr<R>> function, [List arguments]) async
+    _IsolateEntryPoint<FutureOr<R>> function, 
+    [List arguments, TaskPriority priority]) async
   {
     if (this._workers.isEmpty) throw IsolateNoAvailableException();
 
-    final task = this._schedule.add(function, arguments);
+    final task = this._schedule.add(function, arguments, priority);
     this._arrangeWorkerOnSchedule();
 
-    final result = await task.stream.first;
-    task.close();
-
+    final result = await task.single();
     this._arrangeWorkerOnSchedule();
 
     if (result is IsolateExitResult) return null;
@@ -45,11 +44,12 @@ class IsolateSupervisor
   /// Returns a stream that contains results of the execution of the [function]
   /// with passed arguments.
   Stream<R> launch<R>(
-    IsolateEntryPoint<Stream<R>> function, [List arguments]) async*
+    _IsolateEntryPoint<Stream<R>> function, 
+    [List arguments, TaskPriority priority]) async*
   {
     if (this._workers.isEmpty) throw IsolateNoAvailableException();
 
-    final task = this._schedule.add(function, arguments);
+    final task = this._schedule.add(function, arguments, priority);
     this._arrangeWorkerOnSchedule();
 
     try {
@@ -57,8 +57,6 @@ class IsolateSupervisor
         if (result is IsolateExitResult) break;
         if (result is IsolateErrorResult) throw result.error;
         if (result is IsolateValueResult) yield result.value;
-        
-        if (result is! IsolateResult) throw IsolateReturnInvalidTypeException();
       }
     }
     finally {  
@@ -70,11 +68,12 @@ class IsolateSupervisor
   /// Restarts isolates and incomplete tasks.
   Future<void> restart() async 
   {
-    this._schedule.reset();
     await this._workers.restart();
+    this._schedule.reset();
     
     this._arrangeWorkerOnSchedule();
   }
+  
   /// Disposes of the isolate instances.
   Future<void> dispose() async 
   {
@@ -87,9 +86,7 @@ class IsolateSupervisor
     final worker = await this._workers.take();
     if (worker == null) return;
 
-    final task = this._schedule.attach(worker);
-    if (task == null) return worker.free();
-
-    this._schedule.addListener(task?.execute());
+    final task = this._schedule.unfulfilled();
+    this._schedule.addListener(worker.execute(task));
   }
 }

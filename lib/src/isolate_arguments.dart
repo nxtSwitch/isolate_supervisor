@@ -14,7 +14,8 @@ class IsolateArguments<A>
   factory IsolateArguments.from(IsolateArguments isolateArguments) => 
     IsolateArguments<A>._(isolateArguments._arguments.whereType<A>());
 
-  /// Obtains the nearest argument of [T] and returns its value.
+  /// Obtains the nearest argument of [T] and returns its value
+  /// or throws a [StateError] if argument does not exist.
   T nearest<T>() => this._arguments.whereType<T>().first;
   
   /// Returns the argument at the given [index] in the arguments list

@@ -20,11 +20,7 @@ class IsolatePool
   {
     for (IsolateWrapper isolate in this._isolates) {
       if (!await isolate.initialize()) continue; 
-      
-      if (isolate.status == IsolateStatus.idle) {
-        isolate.status = IsolateStatus.arrives;
-        return isolate;
-      }
+      if (isolate.isIdle) return isolate..lock();
     }
     return null;
   }

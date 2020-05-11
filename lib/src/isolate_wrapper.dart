@@ -1,6 +1,6 @@
 part of 'isolate_supervisor.dart';
 
-enum IsolateStatus { none, idle, arrives, paused }
+enum _IsolateStatus { none, idle, arrives, attached, paused }
 
 class IsolateWrapper
 {
@@ -11,24 +11,38 @@ class IsolateWrapper
 
   Isolate _isolate;
   Stream _broadcast;
-  IsolateStatus status;
+  _IsolateStatus status;
   
   Completer<bool> _initCompleter;
 
   IsolateWrapper([this.name])
   { 
-    this.status = IsolateStatus.none;
+    this.status = _IsolateStatus.none;
     this._spawn();
   }
 
-  void free() => this.status = IsolateStatus.idle;
+  bool get isIdle => this.status == _IsolateStatus.idle;
+  bool get isAttached => this.status == _IsolateStatus.attached;
 
+  void lock() => this.status = _IsolateStatus.attached;
   Future<bool> initialize() => this._initCompleter.future;
 
   Stream<IsolateResult> execute(IsolateTask task) async*
   {
-    if (task == null) return;
-    if (this._broadcast == null) throw IsolateUndefinedException();
+    if (!this.isAttached) throw IsolateNotIdleException();
+    
+    if (task == null) {
+       this.status = _IsolateStatus.idle;
+       throw IsolateEmptyTaskException();
+    }
+    
+    if (this._sendPort == null || this._broadcast == null) {
+      this.status = _IsolateStatus.none;
+      throw IsolateUndefinedException();
+    }
+
+    task.lock();
+    this.status = _IsolateStatus.arrives;
 
     this._sendPort.send(task);
 
@@ -37,7 +51,7 @@ class IsolateWrapper
       if (result is IsolateExitResult) break;
     }
 
-    this.status = IsolateStatus.idle;
+    this.status = _IsolateStatus.idle;
   }
 
   Future<void> _spawn() async
@@ -64,7 +78,7 @@ class IsolateWrapper
     this._sendPort = await this._broadcast.first;
     this._sendPort.send(this.name);
 
-    this.status = IsolateStatus.idle;
+    this.status = _IsolateStatus.idle;
     this._initCompleter.complete(true);
   }
 
@@ -79,8 +93,9 @@ class IsolateWrapper
     this._isolate?.kill();
     this._receivePort?.close();
 
+    this._sendPort = null;
     this._broadcast = null;
-    this.status = IsolateStatus.none;
+    this.status = _IsolateStatus.none;
 
     this._initCompleter = Completer<bool>();
     this._initCompleter.complete(false);
