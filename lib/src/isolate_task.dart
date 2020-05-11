@@ -3,14 +3,14 @@ part of 'isolate_supervisor.dart';
 enum TaskStatus { awaiting, processing, completed }
 enum TaskPriority { low, regular, high }
 
-typedef IsolateEntryPoint<R, A> = R Function(IsolateContext<R, A> context);
+typedef IsolateEntryPoint<R> = R Function(IsolateContext<R> context);
 
-class IsolateTask<R, A>
+class IsolateTask<R>
 {
-  final A arguments;
+  final List arguments;
   final Capability capability;
   final TaskPriority priority;
-  final IsolateEntryPoint<R, A> function;
+  final IsolateEntryPoint<R> function;
 
   TaskStatus status = TaskStatus.awaiting;
 
@@ -19,13 +19,8 @@ class IsolateTask<R, A>
     this.capability = Capability(),
     this.priority = priority ?? TaskPriority.regular;
 
+  void lock() => this.status = TaskStatus.processing;
   void close() => this.status = TaskStatus.completed;
 
-  @override
-  int get hashCode => capability.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) || 
-      other is IsolateTask && this.capability == other.capability;
+  bool get isAwaiting => this.status == TaskStatus.awaiting;
 }

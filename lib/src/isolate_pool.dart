@@ -12,15 +12,19 @@ class IsolatePool
     final numberOfIsolates = numberOfProcessors > 0 ? numberOfProcessors : 1;
 
     for (int i = 0; i < numberOfIsolates; ++i) {
-      this._isolates.add(IsolateWrapper('Isolate: $i'));
+      this._isolates.add(IsolateWrapper('Isolate[$i]'));
     }
   }
 
-  Future<IsolateWrapper> get free async
+  Future<IsolateWrapper> take() async
   {
     for (IsolateWrapper isolate in this._isolates) {
       if (!await isolate.initialize()) continue; 
-      if (isolate.status == IsolateStatus.idle) return isolate;
+      
+      if (isolate.status == IsolateStatus.idle) {
+        isolate.status = IsolateStatus.arrives;
+        return isolate;
+      }
     }
     return null;
   }

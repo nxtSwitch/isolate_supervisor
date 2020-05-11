@@ -3,55 +3,75 @@ import 'package:test/test.dart';
 import 'package:isolate_supervisor/isolate_supervisor.dart';
 
 void main() {
-  group('A group of stress tests:', () {
+  group('A group of stress tests:', () 
+  {
+    Random random;
     IsolateSupervisor supervisor;
 
-    setUpAll(() => supervisor = IsolateSupervisor());
-    tearDownAll(() async => await supervisor.dispose());
-
-    test('Single long running task', () =>
-      expect(supervisor.compute(longRunningTask, 3), completion(equals(3))));
-
-    test('32 long running task', () 
+    setUpAll(() 
     {
-      final random = Random();
-      final results = List.generate(32, (index) => random.nextInt(3));
+       random = Random();
+       supervisor = IsolateSupervisor();
+    });
 
+    tearDownAll(() async 
+    {
+      await supervisor.dispose();
+    });
+
+    test('Single long running task', ()
+    {
+      final n = random.nextInt(100);
+      expect(supervisor.compute(longRunningTask, [n]), completion(equals(n)));
+    });   
+
+    test('512 long running task', () 
+    {
+      final results = List.generate(512, (index) => random.nextInt(100));
       final futures = [
-        for (int number in results) supervisor.compute(longRunningTask, number)
+        for (int n in results) supervisor.compute(longRunningTask, [n])
       ];
 
       expect(Future.wait(futures), completion(results));
     });
 
-    test('Single long running stream task', () => expect(
-      supervisor.launch(longRunningStreamTask, 3), 
-      emitsInOrder([3, 9, emitsDone])
-    ));
-
-    test('100 long running stream task', () 
+    test('Single long running stream task', () 
     {
-      final random = Random();
-      final results = List.generate(100, (index) {
-        final number = random.nextInt(3);
+      final n = random.nextInt(100);
+      expect(
+        supervisor.launch(longRunningStreamTask, [n]), 
+        emitsInOrder([n, pow(n, 2), emitsDone])
+      );
+    });
+
+    test('512 long running stream task', () 
+    {
+      final results = List.generate(512, (index) {
+        int number = random.nextInt(100);
         return [number, number * number, emitsDone];
       });
 
       for (List a in results) {
-        expect(supervisor.launch(longRunningStreamTask, a[0]), emitsInOrder(a));
+        expect(
+          supervisor.launch(longRunningStreamTask, [a[0]]), emitsInOrder(a));
       }
     });
   });
 }
 
-Future<int> longRunningTask(IsolateContext context) async => 
-  await Future.delayed(Duration(seconds: context.args), () => context.args);
-
-Stream<int> longRunningStreamTask(IsolateContext context) async*
+Future<num> longRunningTask(IsolateContext context) async
 {
-  final duration = Duration(milliseconds: context.args * 100);
+  final timeout = context.arguments.nearest<int>();
+  final duration = Duration(milliseconds: timeout.toInt());
 
-  yield context.args;
-  yield await Future.delayed(duration, () => context.args * context.args);
+  return await Future.delayed(duration, () => timeout);
 }
-  
+
+Stream<num> longRunningStreamTask(IsolateContext context) async*
+{
+  final timeout = context.arguments.nearest<int>();
+  final duration = Duration(milliseconds: timeout);
+
+  context.sink.add(timeout);
+  yield await Future.delayed(duration, () => pow(timeout, 2));
+}

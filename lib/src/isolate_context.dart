@@ -1,30 +1,23 @@
 part of 'isolate_supervisor.dart';
 
-class IsolateContext<R, A>
+/// A handle to the isolate task context.
+///
+/// [IsolateContext] objects are passed to [IsolateEntryPoint] functions.
+/// Each isolate task has its own [IsolateContext].
+class IsolateContext<R>
 {
-  final String debugName;
-  final IsolateTask<R, A> _task;
-  final IsolateContextSink sink;
-
-  A get args => this._task.arguments;
-
-  IsolateContext(this._task, SendPort outPort, this.debugName) :
-    this.sink = IsolateContextSink<R>(outPort, _task);
-}
-
-class IsolateContextSink<R>
-{
-  final SendPort outPort;
-  final IsolateTask task;
+  /// Name used to identify isolate in debuggers or loggers.
+  final String isolateName;
   
-  IsolateContextSink(this.outPort, this.task);
+  final IsolateTask<R> _task;
+  final IsolateSink<R> _sink;
 
-  void add(R value) => outPort.send(IsolateResult.value(task, value));
-  void addError(Object error) => outPort.send(IsolateResult.error(task, error));
+  /// Returns the isolate sink.
+  IsolateSink<R> get sink => this._sink;
 
-  void exit([R value])
-  {
-    outPort.send(IsolateResult.exit(task, value));
-    throw IsolateForceExitException();
-  }
+  /// Returns the isolate arguments collection.
+  IsolateArguments get arguments => IsolateArguments.of(this);
+
+  IsolateContext._(this._task, SendPort outPort, this.isolateName) :
+    this._sink = IsolateSink<R>._(outPort, _task);
 }

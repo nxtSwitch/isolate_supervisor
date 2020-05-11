@@ -21,23 +21,23 @@ class IsolateWrapper
     this._spawn();
   }
 
+  void free() => this.status = IsolateStatus.idle;
+
   Future<bool> initialize() => this._initCompleter.future;
 
   Stream<IsolateResult> execute(IsolateTask task) async*
   {
+    if (task == null) return;
     if (this._broadcast == null) throw IsolateUndefinedException();
-    
+
     this._sendPort.send(task);
 
-    await for(final result in this._broadcast.cast<IsolateResult>()) 
-    {
+    await for(final result in this._broadcast.cast<IsolateResult>()) {
       yield result;
-
-      if (result is IsolateExitResult) {
-        this.status = IsolateStatus.idle;
-        return;
-      }
+      if (result is IsolateExitResult) break;
     }
+
+    this.status = IsolateStatus.idle;
   }
 
   Future<void> _spawn() async
@@ -50,7 +50,8 @@ class IsolateWrapper
         IsolateWrapper._entryPoint, 
         this._receivePort.sendPort, 
         paused: false,
-        errorsAreFatal: false,
+        debugName: this.name,
+        errorsAreFatal: false
       );
     } 
     on dynamic catch (_) {
@@ -80,6 +81,9 @@ class IsolateWrapper
 
     this._broadcast = null;
     this.status = IsolateStatus.none;
+
+    this._initCompleter = Completer<bool>();
+    this._initCompleter.complete(false);
   }
 
   static void _entryPoint(SendPort outPort) async 
@@ -88,32 +92,37 @@ class IsolateWrapper
     outPort.send(inPort.sendPort);
     
     final broadcast = inPort.asBroadcastStream();
-    final debugName = await broadcast.first;
+    final isolateName = await broadcast.first;
 
     await for (IsolateTask task in broadcast) {
-      final context = IsolateContext(task, outPort, debugName);
-
+      final context = IsolateContext._(task, outPort, isolateName);
+      
       try {
         final result = task.function(context);
         
         if (result is! Stream) {
-          context.sink.exit(await result);
+          context.sink.add(await result);
+          continue;
         }
 
         await for (final value in result) {
           context.sink.add(value);
         }
-
-        context.sink.exit();
       } 
-      on IsolateForceExitException catch(_) { }
       on dynamic catch (error) {
         try {
           context.sink.addError(error);
-        } catch (error) {
+        } 
+        on ArgumentError catch (_) {
           context.sink.addError(
-            IsolateTooBigStacktraceException(debugName, error.toString()));
+            IsolateTooBigStacktraceException(isolateName, error));
         }
+        catch(_) {
+          context.sink.addError(IsolateUndefinedException());
+        }
+      }
+      finally {
+        outPort.send(IsolateResult.exit(task));
       }
     }
 
