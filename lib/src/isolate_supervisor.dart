@@ -1,66 +1,67 @@
-import 'dart:io';
 import 'dart:async';
-import 'dart:isolate';
 
-part 'isolate_task.dart';
-part 'isolate_pool.dart';
-part 'isolate_sink.dart';
-part 'isolate_result.dart';
-part 'isolate_wrapper.dart';
-part 'isolate_context.dart';
-part 'isolate_schedule.dart';
-part 'isolate_arguments.dart';
-part 'isolate_exceptions.dart';
+import './isolate_types.dart';
+import './isolate_exceptions.dart';
+
+import './events/isolate_event.dart';
+import './registry/isolate_registry.dart';
+import './schedule/isolate_schedule.dart';
 
 class IsolateSupervisor
 {
-  final _workers = IsolatePool();
-  final _schedule = IsolateSchedule();
+  final IsolateRegistry _isolates;
+  final IsolateSchedule _schedule;
 
-  IsolateSupervisor._();
-  factory IsolateSupervisor() => _instance;
-  static final IsolateSupervisor _instance = IsolateSupervisor._();
+  IsolateSupervisor._(this._schedule, this._isolates);
+
+  IsolateSupervisor() :
+    this._(IsolateSchedule(), IsolateRegistry(null, false));
+
+  factory IsolateSupervisor.spawn({int count, bool lazily}) => 
+    IsolateSupervisor._(IsolateSchedule(), IsolateRegistry(count, lazily));
 
   /// Returns a result of the execution of the [function] with passed arguments.
   Future<R> compute<R>(
-    _IsolateEntryPoint<FutureOr<R>> function, 
+    IsolateEntryPoint<R> function, 
     [List arguments, TaskPriority priority]) async
   {
-    if (this._workers.isEmpty) throw IsolateNoAvailableException();
+    if (this._isolates.isEmpty) throw IsolateNoIsolateAvailableException();
 
     final task = this._schedule.add(function, arguments, priority);
     this._arrangeWorkerOnSchedule();
 
-    final result = await task.single();
-    this._arrangeWorkerOnSchedule();
+    try {
+      final result = await task.single();
+      
+      if (result is IsolateErrorResult<R>) throw result.error;
+      if (result is IsolateValueResult<R>) return result.value;
+    }
+    finally {
+      this._arrangeWorkerOnSchedule();
+    }
 
-    if (result is IsolateExitResult) return null;
-    if (result is IsolateErrorResult) throw result.error;
-    if (result is IsolateValueResult) return result.value;
-    
-    throw IsolateReturnInvalidTypeException();
+    return null;
   }
 
   /// Returns a stream that contains results of the execution of the [function]
   /// with passed arguments.
   Stream<R> launch<R>(
-    _IsolateEntryPoint<Stream<R>> function, 
+    IsolateEntryPoint<R> function, 
     [List arguments, TaskPriority priority]) async*
   {
-    if (this._workers.isEmpty) throw IsolateNoAvailableException();
+    if (this._isolates.isEmpty) throw IsolateNoIsolateAvailableException();
 
     final task = this._schedule.add(function, arguments, priority);
     this._arrangeWorkerOnSchedule();
 
     try {
       await for (final result in task.stream) {
-        if (result is IsolateExitResult) break;
-        if (result is IsolateErrorResult) throw result.error;
-        if (result is IsolateValueResult) yield result.value;
+        if (result is IsolateErrorResult<R>) throw result.error;
+        if (result is IsolateValueResult<R>) yield result.value;
       }
     }
     finally {  
-      task.close();
+      await task.done;
       this._arrangeWorkerOnSchedule();
     }
   }
@@ -68,7 +69,7 @@ class IsolateSupervisor
   /// Restarts isolates and incomplete tasks.
   Future<void> restart() async 
   {
-    await this._workers.restart();
+    await this._isolates.restart();
     this._schedule.reset();
     
     this._arrangeWorkerOnSchedule();
@@ -77,16 +78,16 @@ class IsolateSupervisor
   /// Disposes of the isolate instances.
   Future<void> dispose() async 
   {
-    await this._workers.dispose();
-    await this._schedule.close();
+    await this._isolates.dispose();
+    await this._schedule.clear();
   }
 
   void _arrangeWorkerOnSchedule() async
   {
-    final worker = await this._workers.take();
-    if (worker == null) return;
+    final isolate = await this._isolates.take();
+    if (isolate == null) return;
 
-    final task = this._schedule.unfulfilled();
-    this._schedule.addListener(worker.execute(task));
+    final enabled = this._schedule.schedule(isolate);
+    if (!enabled) return isolate.free();
   }
 }

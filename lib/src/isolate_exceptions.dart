@@ -1,24 +1,24 @@
-part of 'isolate_supervisor.dart';
-
 abstract class IsolateException implements Exception {}
 
 /// Thrown when unknown exception occurred.
-class IsolateUndefinedException implements IsolateException {}
+class IsolateUndefinedException implements IsolateException 
+{
+  final String isolateName;
+  IsolateUndefinedException(this.isolateName);
+}
 
 /// Thrown when there aren't any isolate available to take the job.
-class IsolateNoAvailableException implements IsolateException {}
+class IsolateNoIsolateAvailableException implements IsolateException {}
 
-/// Thrown when the task was forcibly canceled.
-class IsolateForceExitException implements IsolateException {}
+/// Thrown when there aren't any processor available.
+class IsolateNoProcessorsAvailableException implements IsolateException 
+{
+  final int availableProcessors;
+  IsolateNoProcessorsAvailableException(this.availableProcessors);
 
-/// Thrown when the result type is not [IsolateResult].
-class IsolateReturnInvalidTypeException implements IsolateException {}
-
-/// 
-class IsolateEmptyTaskException implements IsolateException {}
-
-/// 
-class IsolateNotIdleException implements IsolateException {}
+  @override
+  String toString() => 'Available processors: $availableProcessors';
+}
 
 /// Thrown when error [StackTrace] is too big to return from isolate.
 class IsolateTooBigStacktraceException implements IsolateException 
