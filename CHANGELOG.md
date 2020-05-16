@@ -1,3 +1,7 @@
+## 1.0.1+2
+
+- Documentation Updates
+
 ## 1.0.1
 
 - Fixes bug where `IsolateSupervisor.dispose()` cannot correctly terminate isolates.

@@ -8,6 +8,7 @@ include: package:pedantic/analysis_options.yaml
 linter:
   rules:
     unnecessary_this: false
+    public_member_api_docs: false
     omit_local_variable_types: false
     lines_longer_than_80_chars: true
 

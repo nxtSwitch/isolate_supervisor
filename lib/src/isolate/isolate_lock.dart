@@ -4,8 +4,6 @@ enum _IsolateLockState { released, acquired }
 
 class _IsolateLock implements IsolateLock
 {
-  bool _isReleased = false;
-
   _IsolateLockState _state;
 
   final String name;
