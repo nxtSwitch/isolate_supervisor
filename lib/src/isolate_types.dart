@@ -16,11 +16,11 @@ abstract class IsolateContext<R>
   /// Returns the isolate sink.
   IsolateSink<R> get sink;
 
-  /// Returns the primitive lock object.
-  Future<IsolateLock> lock([String name]);
-
   /// Returns the isolate arguments collection.
   IsolateArguments get arguments;
+
+  /// Returns the primitive lock object.
+  IsolateLock lock([String name]);
 }
 
 /// A isolate data receiver.
@@ -42,20 +42,19 @@ abstract class IsolateArguments<A>
   /// Returns `true` if there is at least one argument exists.
   bool get isNotEmpty;
 
+  /// Returns an [Iterable] of the arguments.
+  Iterable<A> get list;
+
   /// Obtains the nearest argument of [T] and returns its value
   /// or throws a [StateError] if argument does not exist.
   T nearest<T>();
-  
+
+  /// Returns a new [IsolateArguments<T>] with all arguments that have type [T].
+  IsolateArguments<T> whereType<T>();
+
   /// Returns the argument at the given [index] in the arguments list
   /// or throws a [RangeError] if [index] is out of bounds.
   A operator [](int index);
-
-  /// Creates a [IsolateArguments<A>] from [context].
-  factory IsolateArguments.of(IsolateContext context) => null;
-
-  /// Creates a [IsolateArguments<A>] from [IsolateArguments] 
-  /// instance.
-  factory IsolateArguments.from(IsolateArguments arguments) => null;
 }
 
 /// A primitive lock object.
@@ -64,6 +63,9 @@ abstract class IsolateArguments<A>
 /// until it is released.
 abstract class IsolateLock
 {
+  /// Acquires a lock.
+  Future<void> acquire();
+
   /// Releases a lock.
   void release();
 }

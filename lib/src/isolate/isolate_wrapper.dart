@@ -10,7 +10,7 @@ part 'isolate_lock.dart';
 part 'isolate_context.dart';
 part 'isolate_arguments.dart';
 
-enum _IsolateStatus { none, initialized, idle, arrives, attached, paused }
+enum _IsolateStatus { none, initialized, idle, arrives, attached }
 
 class _IsolateNotIdleException  implements IsolateException {}
 class _IsolateEmptyTaskException   implements IsolateException {}
@@ -27,34 +27,55 @@ class IsolateWrapper implements IsolateScheduledExecutor
   Completer<bool> _initCompleter;
   Stream<IsolateEvent> _broadcast;
 
+  Function(Stream<IsolateEvent>) _onSpawn;
+
   bool get isIdle => this.status == _IsolateStatus.idle;
   bool get isAttached => this.status == _IsolateStatus.attached;
-
-  Stream<IsolateEvent> get broadcast => this._broadcast;
-
+  bool get isUninitialized => this.status == _IsolateStatus.none;
+  
   void free() => this.status = _IsolateStatus.idle;
   void lock() => this.status = _IsolateStatus.attached;
 
   IsolateWrapper(this.name, bool spawnLazily)
   { 
     this.status = _IsolateStatus.none;
-    this._initCompleter = Completer<bool>();
     
+    this._resetCompleter();
     if (!spawnLazily) this._spawn();
   }
 
   Future<bool> initialize()
   {
-    if (this.status == _IsolateStatus.none) this._spawn();
+    this._spawn();
     return this._initCompleter.future;
+  }
+
+  void listen(Function(Stream<IsolateEvent>) onSpawn)
+  {
+    if (onSpawn == null) return;
+    this._onSpawn = onSpawn;
+  }
+
+  void _resetCompleter() 
+  {
+    this._initCompleter = Completer<bool>();
+    this._initCompleter.future.then(
+      (success) { 
+        if (success && this._onSpawn != null) {
+          this._onSpawn(this._broadcast); 
+        }
+      },
+      onError: (_) {}
+    );
   }
 
   Future<void> _spawn() async
   {
+    if (this._initCompleter.isCompleted) return;
     if (this.status != _IsolateStatus.none) return;
     
-    this._receivePort = ReceivePort();
     this.status = _IsolateStatus.initialized;
+    this._receivePort = ReceivePort();
 
     try {
       this._isolate = await Isolate.spawn(
@@ -74,7 +95,7 @@ class IsolateWrapper implements IsolateScheduledExecutor
       .where((event) => event is IsolateEvent)
       .cast<IsolateEvent>()
       .asBroadcastStream();
-
+    
     final event = await this._broadcast.first;
 
     if (event is! IsolateHandshakeEvent) {
@@ -133,11 +154,18 @@ class IsolateWrapper implements IsolateScheduledExecutor
   Future<void> cancel() async 
   {
     await this.dispose();
+    this._resetCompleter();
+
     await this._spawn();
   }
 
   Future<void> dispose() async 
   {
+    if (!this.isUninitialized) {
+      await this._initCompleter.future;
+      this._resetCompleter();
+    }
+
     this._isolate?.kill();
     this._receivePort?.close();
 
@@ -147,7 +175,7 @@ class IsolateWrapper implements IsolateScheduledExecutor
     this._receivePort = null;
 
     this.status = _IsolateStatus.none;
-    this._initCompleter = Completer<bool>();
+    this._initCompleter.complete(false);
   }
 
   static void _entryPoint(SendPort sendPort) async 

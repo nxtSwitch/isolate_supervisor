@@ -2,29 +2,7 @@ import 'dart:math';
 import 'package:test/test.dart';
 import 'package:isolate_supervisor/isolate_supervisor.dart';
 
-Future<int> longRunningTask(IsolateContext context) async
-{
-  final timeout = context.arguments.nearest<int>();
-  final duration = Duration(milliseconds: timeout.toInt());
-  
-  return await Future.delayed(duration, () => timeout);
-}
-
-Stream<num> longRunningStreamTask(IsolateContext context) async*
-{
-  final timeout = context.arguments.nearest<int>();
-  final duration = Duration(milliseconds: timeout);
-
-  if (timeout == -1) {
-    context.sink.addError(Exception());
-
-    await Future.delayed(Duration(milliseconds: 100));
-    return;
-  }
-
-  context.sink.add(timeout);
-  yield await Future.delayed(duration, () => pow(timeout, 2));
-}
+import './helpers/isolate_entry_points.dart';
 
 void main() 
 {
@@ -43,7 +21,7 @@ void main()
     test('Single long running task', ()
     {
       expect(
-        supervisor.compute(longRunningTask, [first]), 
+        supervisor.compute(longRunningEntryPoint, [first]), 
         completion(equals(first))
       );
     });
@@ -51,7 +29,7 @@ void main()
     test('Single long running stream task', ()
     {
       expect(
-        supervisor.launch(longRunningStreamTask, [first]), 
+        supervisor.launch(longRunningStreamEntryPoint, [first]), 
         emitsInOrder([first, pow(first, 2), emitsDone])
       );
     });
@@ -59,7 +37,7 @@ void main()
     test('$count long running task', ()
     {
       final computes = [
-        for (int n in results) supervisor.compute(longRunningTask, [n])
+        for (int n in results) supervisor.compute(longRunningEntryPoint, [n])
       ];
       expect(Future.wait(computes), completion(results));
     });
@@ -68,7 +46,7 @@ void main()
     {
       for (int n in results) {
         final matcher = emitsInOrder([n, pow(n, 2), emitsDone]);
-        expect(supervisor.launch(longRunningStreamTask, [n]), matcher);
+        expect(supervisor.launch(longRunningStreamEntryPoint, [n]), matcher);
       }
     });
 
@@ -76,7 +54,7 @@ void main()
     {
       for (int _ in results) {
         final matcher = emitsError(isException);
-        expect(supervisor.launch(longRunningStreamTask, [-1]), matcher);
+        expect(supervisor.launch(longRunningStreamEntryPoint, [-1]), matcher);
       }
     });
   });

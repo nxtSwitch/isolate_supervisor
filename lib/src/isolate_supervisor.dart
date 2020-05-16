@@ -9,6 +9,8 @@ import './schedule/isolate_schedule.dart';
 
 class IsolateSupervisor
 {
+  bool _isDestroyed = false;
+
   final IsolateRegistry _isolates;
   final IsolateSchedule _schedule;
 
@@ -20,14 +22,22 @@ class IsolateSupervisor
   factory IsolateSupervisor.spawn({int count, bool lazily}) => 
     IsolateSupervisor._(IsolateSchedule(), IsolateRegistry(count, lazily));
 
-  /// Returns a result of the execution of the [function] with passed arguments.
+  /// Returns the number of isolates.
+  static int numberOfIsolates() => IsolateRegistry.numberOfIsolates;
+
+  /// Returns a result of the execution of the [entryPoint] with passed 
+  /// arguments.
   Future<R> compute<R>(
-    IsolateEntryPoint<R> function, 
+    IsolateEntryPoint<R> entryPoint, 
     [List arguments, TaskPriority priority]) async
   {
-    if (this._isolates.isEmpty) throw IsolateNoIsolateAvailableException();
+    if (entryPoint == null) throw IsolateInvalidEntryPointException(null);
 
-    final task = this._schedule.add(function, arguments, priority);
+    if (this._isDestroyed || !this._isolates.isInitialized) {
+      throw IsolateNoIsolateAvailableException();
+    }
+
+    final task = this._schedule.add(entryPoint, arguments, priority);
     this._arrangeWorkerOnSchedule();
 
     try {
@@ -43,15 +53,19 @@ class IsolateSupervisor
     return null;
   }
 
-  /// Returns a stream that contains results of the execution of the [function]
-  /// with passed arguments.
+  /// Returns a stream that contains results of the execution of the 
+  /// [entryPoint] with passed arguments.
   Stream<R> launch<R>(
-    IsolateEntryPoint<R> function, 
+    IsolateEntryPoint<R> entryPoint, 
     [List arguments, TaskPriority priority]) async*
   {
-    if (this._isolates.isEmpty) throw IsolateNoIsolateAvailableException();
+    if (entryPoint == null) throw IsolateInvalidEntryPointException(null);
 
-    final task = this._schedule.add(function, arguments, priority);
+    if (this._isDestroyed || !this._isolates.isInitialized) {
+      throw IsolateNoIsolateAvailableException();
+    }
+
+    final task = this._schedule.add(entryPoint, arguments, priority);
     this._arrangeWorkerOnSchedule();
 
     try {
@@ -66,27 +80,32 @@ class IsolateSupervisor
     }
   }
 
-  /// Restarts isolates and incomplete tasks.
-  Future<void> restart() async 
+  /// Alias of [reset].
+  @Deprecated('Use IsolateSupervisor.reset() instead.')
+  Future<void> restart() => this.reset();
+
+  /// Restarts isolates and cancels incomplete tasks.
+  Future<void> reset() async 
   {
+    await this._schedule.reset();
     await this._isolates.restart();
-    this._schedule.reset();
-    
-    this._arrangeWorkerOnSchedule();
   }
   
   /// Disposes of the isolate instances.
   Future<void> dispose() async 
   {
-    await this._isolates.dispose();
+    this._isDestroyed = true;
     await this._schedule.clear();
+    await this._isolates.dispose();
   }
 
   void _arrangeWorkerOnSchedule() async
   {
+    if (this._isDestroyed) return;
+
     final isolate = await this._isolates.take();
     if (isolate == null) return;
-
+    
     final enabled = this._schedule.schedule(isolate);
     if (!enabled) return isolate.free();
   }

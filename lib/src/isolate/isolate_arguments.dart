@@ -2,24 +2,29 @@ part of 'isolate_wrapper.dart';
 
 class _IsolateArguments<A> implements IsolateArguments<A>
 {
-  final Iterable<A> _arguments;
-  _IsolateArguments._(this._arguments);
+  final Iterable<A> _iterable;
 
-  factory _IsolateArguments.of(_IsolateContext context) => 
-    _IsolateArguments<A>._(context._task.arguments.whereType<A>());
-
-  factory _IsolateArguments.from(_IsolateArguments arguments) => 
-    _IsolateArguments<A>._(arguments._arguments.whereType<A>());
-
-  @override
-  T nearest<T>() => this._arguments.whereType<T>().first;
+  _IsolateArguments(this._iterable);
   
-  @override
-  A operator [](int index) => this._arguments.elementAt(index);
+  _IsolateArguments.of(_IsolateContext context) :
+    this(context._task.arguments.whereType<A>());
 
   @override
-  bool get isEmpty => this._arguments.isEmpty;
+  IsolateArguments<T> whereType<T>() => 
+    _IsolateArguments<T>(this._iterable.whereType<T>());
 
   @override
-  bool get isNotEmpty => this._arguments.isNotEmpty;
+  Iterable<A> get list => this._iterable;
+
+  @override
+  T nearest<T>() => this._iterable.whereType<T>().first;
+
+  @override
+  A operator [](int index) => this._iterable.elementAt(index);
+
+  @override
+  bool get isEmpty => this._iterable.isEmpty;
+
+  @override
+  bool get isNotEmpty => this._iterable.isNotEmpty;
 }

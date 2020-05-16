@@ -2,64 +2,69 @@ part of 'isolate_registry.dart';
 
 class IsolateMutexRegistry
 {
-  final _isolates = <IsolateWrapper>{};
-  final _locks = <String, Queue<IsolateLockEvent>>{};
-
-  IsolateMutexRegistry._();
-  factory IsolateMutexRegistry() => _instance;
-  static final IsolateMutexRegistry _instance = IsolateMutexRegistry._();
+  final _locks = <String, Queue<IsolateMutexRegistryEntry>>{};
 
   void register(IsolateWrapper isolate) 
   {
     if (isolate == null) return;
 
-    final isAdded = this._isolates.add(isolate);
-    if (!isAdded) return;
-
-    isolate.broadcast
-      ?.where((event) => event is IsolateLockEvent)
-      ?.cast<IsolateLockEvent>()
-      ?.listen(this._handleEvents, onError: (_) {}, cancelOnError: true);
+    isolate.listen((broadcast) {
+      broadcast
+        ?.where((event) => event is IsolateLockEvent)
+        ?.cast<IsolateLockEvent>()
+        ?.listen(
+          (event) => this._handleEvents(event, isolate), 
+          onDone: () => this._removeLocks(isolate),
+          onError: (_) => this._removeLocks(isolate),
+          cancelOnError: true
+        );
+    });
   }
 
-  void _handleEvents(IsolateLockEvent event)
+  void _removeLocks(IsolateWrapper isolate)
   {
-    if (event is IsolateLockAcquireEvent) this._add(event);
-    if (event is IsolateLockReleaseEvent) this._remove(event);
-  }
+    for (final locks in this._locks.values) {
+      if (locks.isEmpty) continue;
 
-  void _add(IsolateLockAcquireEvent lock) 
-  {
-    this._locks[lock.name] ??= Queue<IsolateLockEvent>();
-    this._locks[lock.name].add(lock);
+      final needUpdate = locks.first.isolate == isolate;
+      locks.removeWhere((lock) => lock.isolate == isolate);
 
-    final needUpdate = this._locks[lock.name].first == lock;
-    if (needUpdate) this._update(lock.name);
-  }
-
-  void _remove(IsolateLockReleaseEvent lock) 
-  {
-    if (!this._locks.containsKey(lock.name)) return;
-    if (this._locks[lock.name].isEmpty) return;
-
-    final needUpdate = this._locks[lock.name].first == lock;
-    this._locks[lock.name].removeWhere((event) => event == lock);
-
-    if (needUpdate) this._update(lock.name);
-  }
-
-  void _update(String lockName) 
-  {
-    if (!this._locks.containsKey(lockName)) return;
-
-    if (this._locks[lockName].isEmpty) 
-    {
-      this._locks.remove(lockName);
-      return;
+      if (needUpdate && locks.isNotEmpty) this._update(locks.first);
     }
+  }
 
-    for (final isolate in this._isolates) {
-      isolate.sendEvent(this._locks[lockName].first);
-    }
+  void _handleEvents(IsolateLockEvent event, IsolateWrapper isolate)
+  {
+    final lock = IsolateMutexRegistryEntry(isolate, event);
+
+    if (event is IsolateLockAcquireEvent) this._add(lock);
+    if (event is IsolateLockReleaseEvent) this._remove(lock);
+  }
+
+  void _add(IsolateMutexRegistryEntry lock) 
+  {
+    final name = lock.event.name;
+    this._locks[name] ??= Queue<IsolateMutexRegistryEntry>();
+
+    this._locks[name].add(lock);
+    if (this._locks[name].length == 1) this._update(lock);
+  }
+
+  void _remove(IsolateMutexRegistryEntry lock) 
+  {
+    final name = lock.event.name;
+    if (this._locks[name]?.isEmpty ?? false) return;
+
+    final needUpdate = this._locks[name].first == lock;
+    this._locks[name].removeWhere((entry) => entry == lock);
+
+    if (needUpdate && this._locks[name].isNotEmpty) {
+      this._update(this._locks[name].first);
+    };
+  }
+  
+  void _update(IsolateMutexRegistryEntry lock)
+  {
+    lock.isolate.sendEvent(lock.event);
   }
 }

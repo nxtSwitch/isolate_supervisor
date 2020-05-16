@@ -6,7 +6,7 @@ class _IsolateContext<R> implements IsolateContext<R>
   final SendPort _sendPort;
   final String _isolateName;
   final IsolateRunnableTask<R> _task;
-  final List<_IsolateLock> _locks = <_IsolateLock>[];
+  final Map<String, _IsolateLock> _locks = {};
 
   @override
   String get isolateName => this._isolateName;
@@ -18,11 +18,11 @@ class _IsolateContext<R> implements IsolateContext<R>
   IsolateArguments get arguments => _IsolateArguments.of(this);
 
   @override
-  Future<IsolateLock> lock([String name]) =>
-    (this._locks..add(_IsolateLock.of(this, name))).last._acquire();
+  IsolateLock lock([String name]) => 
+    this._locks[name] ??= _IsolateLock.of(this, name);
     
   _IsolateContext._(
     this._task, this._stream, this._sendPort, this._isolateName);
 
-  void _releaseLocks() => this._locks.forEach((lock) => lock.release());
+  void _releaseLocks() => this._locks.values.forEach((lock) => lock.release());
 }

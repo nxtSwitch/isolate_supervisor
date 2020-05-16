@@ -30,21 +30,18 @@ class IsolateSchedule
     final task = this._tasks.firstWhere(
       (entry) => entry.isAwaiting, orElse: () => null);
 
-    task?.lock();
     task?.listen(executor.execute(task.object));
-
     return task != null;
   }
 
-  void reset()
+  void clear() async 
   {
-    this._tasks.removeWhere((task) => task.isCompleted);
-    this._tasks.forEach((task) { if (task.isProcessing) task.reset(); });
-  } 
-
-  Future<void> clear() async 
-  {
-    await Future.wait(this._tasks.map((task) => task.close()));
-    this._tasks.clear();
+    this._tasks.forEach((task) => task.close());
+    await this._tasks.clear();
   }
+
+  void reset() async
+  {
+    await Future.wait(this._tasks.map((task) => task.cancel()));
+  } 
 }

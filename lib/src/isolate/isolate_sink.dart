@@ -7,8 +7,8 @@ class _IsolateSink<R> implements IsolateSink<R>
 
   _IsolateSink._(this._sendPort, this._capability);
 
-  factory _IsolateSink.of(_IsolateContext<R> context) => 
-    _IsolateSink<R>._(context._sendPort, context._task.capability);
+  _IsolateSink.of(_IsolateContext<R> context) : 
+    this._(context._sendPort, context._task.capability);
 
   @override
   void add(R value) => 

@@ -3,33 +3,7 @@ import 'dart:math';
 import 'package:test/test.dart';
 import 'package:isolate_supervisor/isolate_supervisor.dart';
 
-Future<void> taskWithoutLock(IsolateContext context) async
-{
-  await Future.delayed(Duration(milliseconds: 100));
-}
-
-Future<void> taskWithLock(IsolateContext context) async
-{
-  final lock = await context.lock();
-  await Future.delayed(Duration(milliseconds: 100));
-  lock.release();
-}
-
-Future<int> taskWithNotReleasedLock(IsolateContext context) async
-{
-  await context.lock();
-  return context.arguments.nearest();
-}
-
-Future<String> taskWithNamedLock(IsolateContext context) async
-{
-  String name = context.arguments[0];
-
-  await context.lock(name);
-  await Future.delayed(Duration(milliseconds: 100));
-
-  return context.arguments.nearest();
-}
+import './helpers/isolate_entry_points.dart';
 
 void main() 
 {
@@ -45,27 +19,37 @@ void main()
     test('Tasks with locks', () async
     {
       final computes = [
-        for (int i = 0; i < count; ++i) supervisor.compute(taskWithLock)
+        for (int i = 0; i < count; ++i) 
+          supervisor.compute(lockEntryPoint, [10, 0, ''])
       ];
 
       final stopwatch = Stopwatch()..start();
       await Future.wait(computes);
       stopwatch.stop();
 
-      expect(stopwatch.elapsedMilliseconds, greaterThanOrEqualTo(count * 100));
+      expect(stopwatch.elapsedMilliseconds, greaterThanOrEqualTo(count * 10));
+    });
+
+    test('Tasks with double lock', () async
+    {
+      final computes = [
+        for (int i = 0; i < count; ++i) 
+          supervisor.compute(doubleLockEntryPoint, [10])
+      ];
+      expect(Future.wait(computes), completion(List.filled(count, 10)));
     });
 
     test('Tasks without locks', () async
     {
       final computes = [
-        for (int i = 0; i < count; ++i) supervisor.compute(taskWithoutLock)
+        for (int i = 0; i < count; ++i) supervisor.compute(defaultEntryPoint)
       ];
 
       final stopwatch = Stopwatch()..start();
       await Future.wait(computes);
       stopwatch.stop();
 
-      expect(stopwatch.elapsedMilliseconds, lessThanOrEqualTo(count * 100));
+      expect(stopwatch.elapsedMilliseconds, lessThan(count * 10));
     });
 
     test('Tasks with not released locks', () async
@@ -74,7 +58,8 @@ void main()
       final results = List.generate(count, (index) => random.nextInt(100));
 
       final computes = [
-        for (int n in results) supervisor.compute(taskWithNotReleasedLock, [n])
+        for (int n in results) 
+          supervisor.compute(lockNotReleasedEntryPoint, [n])
       ];
 
       expect(Future.wait(computes), completion(results));
@@ -82,22 +67,44 @@ void main()
 
     test('Tasks with named locks', () async
     {
-      final odd = List.filled(count ~/ 2, 'odd');
-      final even = List.filled(count ~/ 2, 'even');
-      final names = [...odd, ...even]..shuffle();
+      final locks = ['a', 'b', 'c'];
+      final names = List.generate(count, (i) => locks[i % 3]);
+      final results = names.map((c) => c.codeUnitAt(0));
 
       final computes = [
-        for (final name in names) supervisor.compute(taskWithNamedLock, [name])
+        for (final name in names) 
+          supervisor.compute(lockEntryPoint, [100, name.codeUnitAt(0), name])
       ];
 
       final stopwatch = Stopwatch()..start();
       await Future.wait(computes);
       stopwatch.stop();
 
-      final elapsedMilliseconds = stopwatch.elapsedMilliseconds;
+      expect(Future.wait(computes), completion(results));
+      expect(
+        stopwatch.elapsedMilliseconds, 
+        inInclusiveRange(count * 100 / 4, count * 100 / 2)
+      );
+    });
 
-      expect(Future.wait(computes), completion(names));
-      expect(elapsedMilliseconds, lessThanOrEqualTo(count * 100));
+    test('Reset tasks with locks', () async
+    {
+      final canceled = [
+        for (int i = 0; i < count; ++i) 
+          supervisor.compute(lockEntryPoint, [10000, i, 'lock'])
+      ];
+
+      await Future.delayed(Duration(milliseconds: 500));
+      await supervisor.reset();
+
+      final computes = [
+        for (int i = 0; i < count; ++i) 
+          supervisor.compute(lockEntryPoint, [0, i, 'lock'])
+      ];
+
+      expect(Future.wait(canceled), completion(List.filled(count, null)));
+      expect(Future.wait(computes), completion(List.generate(count, (i) => i)));
     });
   });
 }
+

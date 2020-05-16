@@ -16,6 +16,11 @@ abstract class IsolateEvent
 
   factory IsolateEvent.lock(Capability capability) => 
     IsolateExitEvent(capability);
+
+  @override
+  bool operator ==(Object other) =>
+    identical(this, other) ||
+    other is IsolateEvent && this.capability == other.capability;
 }
 
 class IsolateHandshakeEvent extends IsolateEvent

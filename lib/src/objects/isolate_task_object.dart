@@ -13,7 +13,8 @@ class IsolateTask<R> implements IsolateRunnableTask<R>
   @override
   final Capability capability = Capability();
 
-  IsolateTask(this.function, this.arguments, TaskPriority priority) :
+  IsolateTask(this.function, List arguments, TaskPriority priority) :
+    this.arguments = arguments ?? [],
     this.priority = priority ?? TaskPriority.regular;
 
   @override
