@@ -1,7 +1,10 @@
+/// IsolateSupervisor package.
+ 
 library isolate_supervisor;
 
-export 'src/isolate_exceptions.dart';
-export 'src/isolate_supervisor.dart';
+export 'src/exceptions.dart';
+export 'src/supervisor.dart';
 
-export 'src/isolate_types.dart'
-    hide IsolateRunnableTask, IsolateScheduledExecutor;
+export 'src/base/isolate_task.dart';
+export 'src/base/isolate_context.dart';
+export 'src/base/isolate_entry_point.dart';

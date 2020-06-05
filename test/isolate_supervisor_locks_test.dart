@@ -13,7 +13,7 @@ void main()
   {
     IsolateSupervisor supervisor;
 
-    setUpAll(() => supervisor = IsolateSupervisor.spawn(count: 4));
+    setUpAll(() => supervisor = IsolateSupervisor.spawn(count: 6));
     tearDownAll(() => supervisor?.dispose());
 
     test('Tasks with locks', () async
@@ -69,6 +69,8 @@ void main()
     {
       final locks = ['a', 'b', 'c'];
       final names = List.generate(count, (i) => locks[i % 3]);
+
+      names.shuffle();
       final results = names.map((c) => c.codeUnitAt(0));
 
       final computes = [

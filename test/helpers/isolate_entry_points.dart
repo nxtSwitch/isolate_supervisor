@@ -1,9 +1,20 @@
 import 'dart:math';
 import 'package:isolate_supervisor/isolate_supervisor.dart';
 
-Future<void> defaultEntryPoint(IsolateContext context) async
+int defaultEntryPoint(IsolateContext context) => 42;
+
+void defaultEmptyEntryPoint(IsolateContext context) {}
+
+Future<void> defaultAsyncEntryPoint(IsolateContext context) async
 {
   await Future.delayed(Duration(milliseconds: 10));
+}
+
+Stream defaultEmptyStreamEntryPoint(IsolateContext context) async* {}
+
+Stream defaultStreamEntryPoint(IsolateContext context) async*
+{
+  yield 42;
 }
 
 Future<int> lockEntryPoint(IsolateContext context) async
@@ -61,4 +72,14 @@ Stream<num> longRunningStreamEntryPoint(IsolateContext context) async*
 
   context.sink.add(timeout);
   yield await Future.delayed(duration, () => pow(timeout, 2));
+}
+
+Stream<num> bidirectionalEntryPoint(IsolateContext context) async*
+{
+  yield context.arguments.nearest();
+
+  await for(final n in context.input) {
+    yield n;
+    if (n == 42) return;
+  }
 }

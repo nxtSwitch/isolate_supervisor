@@ -1,4 +1,4 @@
-part of 'isolate_wrapper.dart';
+part of './../isolate_worker.dart';
 
 enum _IsolateLockState { released, acquired }
 
@@ -12,12 +12,13 @@ class _IsolateLock implements IsolateLock
   final String _isolateName;
   final Capability _capability = Capability();
 
-  _IsolateLock._(_IsolateContext context, this.name) :
+  _IsolateLock(WorkerContext context, this.name) :
     this._stream = context._stream,
     this._sendPort = context._sendPort,
     this._isolateName = context._isolateName;
 
-  _IsolateLock.of(_IsolateContext context, String name) : this._(context, name);
+  _IsolateLock.of(IsolateContext context, String name) : 
+    this(context, name);
 
   @override
   void release() 
@@ -45,13 +46,4 @@ class _IsolateLock implements IsolateLock
 
     if (event == null) throw IsolateUndefinedException(this._isolateName);
   }
-
-  @override
-  int get hashCode => this.name.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is _IsolateLock &&
-      runtimeType == other.runtimeType && this.name == other.name;
 }

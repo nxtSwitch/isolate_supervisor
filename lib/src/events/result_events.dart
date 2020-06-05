@@ -1,6 +1,6 @@
-part of 'isolate_event.dart';
+part of 'events.dart';
 
-abstract class IsolateResult<R> extends IsolateEvent
+abstract class IsolateResult<R> extends _IsolateEvent
 {
   IsolateResult(capability) : super(capability);
 

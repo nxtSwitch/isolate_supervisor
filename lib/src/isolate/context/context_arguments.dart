@@ -1,4 +1,4 @@
-part of 'isolate_wrapper.dart';
+part of './../isolate_worker.dart';
 
 class _IsolateArguments<A> implements IsolateArguments<A>
 {
@@ -6,7 +6,7 @@ class _IsolateArguments<A> implements IsolateArguments<A>
 
   _IsolateArguments(this._iterable);
   
-  _IsolateArguments.of(_IsolateContext context) :
+  _IsolateArguments.of(WorkerContext context) :
     this(context._task.arguments.whereType<A>());
 
   @override
@@ -17,14 +17,14 @@ class _IsolateArguments<A> implements IsolateArguments<A>
   Iterable<A> get list => this._iterable;
 
   @override
-  T nearest<T>() => this._iterable.whereType<T>().first;
-
-  @override
-  A operator [](int index) => this._iterable.elementAt(index);
-
-  @override
   bool get isEmpty => this._iterable.isEmpty;
 
   @override
   bool get isNotEmpty => this._iterable.isNotEmpty;
+
+  @override
+  T nearest<T>() => this._iterable.whereType<T>().first;
+
+  @override
+  A operator [](int index) => this._iterable.elementAt(index);
 }

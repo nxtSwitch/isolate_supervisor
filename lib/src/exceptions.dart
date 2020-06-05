@@ -60,5 +60,5 @@ class IsolateTooBigStacktraceException extends Error implements IsolateException
     this._stackTrace = error is Error ? error.stackTrace.toString() : '';
 
   @override
-  String toString() => '$isolateName - $message\n';
+  String toString() => '$isolateName: $message'; // \n$_stackTrace
 }

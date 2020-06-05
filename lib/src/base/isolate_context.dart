@@ -1,12 +1,6 @@
-/// Possible priorities for tasks.
-enum TaskPriority { low, regular, high }
-
-/// Isolate entrypoint function.
-typedef IsolateEntryPoint<R> = Function(IsolateContext<R> context);
-
 /// A handle to the isolate task context.
 ///
-/// [IsolateContext] objects are passed to [IsolateEntryPoint] functions.
+/// [IsolateContext] objects are passed to entry point functions.
 /// Each isolate task has its own [IsolateContext].
 abstract class IsolateContext<R>
 {
@@ -15,6 +9,9 @@ abstract class IsolateContext<R>
 
   /// Returns the isolate sink.
   IsolateSink<R> get sink;
+
+  /// Returns the input stream of the task.
+  Stream get input;
 
   /// Returns the isolate arguments collection.
   IsolateArguments get arguments;
@@ -68,19 +65,4 @@ abstract class IsolateLock
 
   /// Releases a lock.
   void release();
-}
-
-/// An object that can be run by [IsolateScheduledExecutor]. 
-abstract class IsolateRunnableTask<R>
-{
-  dynamic get capability;
-  Iterable get arguments;
-  dynamic run(IsolateContext<R> context);
-}
-
-/// An object that execute submitted [IsolateRunnableTask]. 
-abstract class IsolateScheduledExecutor
-{
-  /// Executes the given [IsolateRunnableTask] inside the isolate.
-  Stream execute(IsolateRunnableTask task);
 }

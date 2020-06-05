@@ -1,6 +1,6 @@
 # Isolate Supervisor
 
-This library constructs higher-level isolate interfaces on top of [dart:isolate](https://api.dart.dev/stable/2.8.2/dart-isolate/dart-isolate-library.html) library. 
+This library constructs higher-level isolate interfaces on top of [dart:isolate](https://api.dart.dev/stable/2.8.2/dart-isolate/dart-isolate-library.html) library.
 
 ## Usage
 
@@ -15,14 +15,14 @@ To use this library, just create an instance of **IsolateSupervisor** like:
 
 As a task, we need to define our entry point function:
 
-> Any top-level function or static method is a valid entry point for an isolate. 
+> Any top-level function or static method is a valid entry point for an isolate.
 
 ```dart
   Future<int> entryPoint(IsolateContext context) async
   {
     int timeout = context.arguments.nearest();
     final duration = Duration(milliseconds: timeout);
-    
+
     return await Future.delayed(duration, () => timeout);
   }
 
@@ -51,11 +51,15 @@ And execute your tasks:
 
 ## IsolateContext Interface
 
-**lock** is a method that returns the primitive lock object.
+- **sink** is the isolate output sink.
 
-**arguments** is a arguments collection passed into the isolate.
+- **input** is the isolate input stream.
 
-**isolateName** is the name used to identify isolate in debuggers or loggers.
+- **lock** is a method that returns the primitive lock object.
+
+- **arguments** is a arguments collection passed into the isolate.
+
+- **isolateName** is the name used to identify isolate in debuggers or loggers.
 
 ## Locks
 
@@ -66,12 +70,36 @@ At any time, a lock can be held by a single isolate, or by no isolate at all. If
   {
     final name = context.arguments[0];
     final lock = context.lock('sample');
-    
+
     await lock.acquire(); // will block if lock is already held
       await Future.delayed(Duration(milliseconds: 100));
     lock.release();
 
     return name;
+  }
+```
+
+## Communication example
+
+```dart
+  void main() async
+  {
+    final supervisor = IsolateSupervisor();
+
+    final task = await supervisor.execute(communicationEntryPoint);
+    await task.wait;
+
+    task.send('Hello');
+    print(await task.output.first);
+
+    await task.done;
+    await supervisor.dispose();
+  }
+
+  Stream<String> communicationEntryPoint(IsolateContext context) async*
+  {
+    String hello = await context.input.first;
+    yield '${context.isolateName}: $hello World!';
   }
 ```
 

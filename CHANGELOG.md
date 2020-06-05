@@ -1,6 +1,11 @@
+## 1.0.2
+
+- Added `IsolateSupervisor.execute()`.
+- Documentation and Example Updates.
+
 ## 1.0.1+2
 
-- Documentation Updates
+- Documentation Updates.
 
 ## 1.0.1
 
@@ -9,5 +14,4 @@
 
 ## 1.0.0
 
-- Initial version
-
+- Initial version.

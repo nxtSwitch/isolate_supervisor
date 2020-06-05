@@ -1,36 +1,48 @@
 import 'dart:math';
+
 import 'package:test/test.dart';
 import 'package:isolate_supervisor/isolate_supervisor.dart';
 
 import './helpers/isolate_entry_points.dart';
 
-void main() 
+void main([int numberOfIsolates]) 
 {
   final count = 256;
   final random = Random();
   final results = List.generate(count, (index) => random.nextInt(100));
-  final first = results[0];
 
-  group('A group of stress tests:', () 
+  group('A group of stress tests on ${numberOfIsolates ?? 'all'}:', () 
   {
     IsolateSupervisor supervisor;
 
-    setUpAll(() => supervisor = IsolateSupervisor());
-    tearDownAll(() => supervisor?.dispose());
+    setUpAll(()
+    {
+      if (numberOfIsolates == null) {
+        supervisor = IsolateSupervisor();
+      }
+      else {
+        supervisor = IsolateSupervisor.spawn(count: numberOfIsolates);
+      }   
+    });
+
+    tearDownAll(() 
+    {
+      supervisor?.dispose();
+    });
 
     test('Single long running task', ()
     {
       expect(
-        supervisor.compute(longRunningEntryPoint, [first]), 
-        completion(equals(first))
+        supervisor.compute(longRunningEntryPoint, [results[0]]), 
+        completion(equals(results[0]))
       );
     });
 
     test('Single long running stream task', ()
     {
       expect(
-        supervisor.launch(longRunningStreamEntryPoint, [first]), 
-        emitsInOrder([first, pow(first, 2), emitsDone])
+        supervisor.launch(longRunningStreamEntryPoint, [results[0]]), 
+        emitsInOrder([results[0], pow(results[0], 2), emitsDone])
       );
     });
 
@@ -56,6 +68,38 @@ void main()
         final matcher = emitsError(isException);
         expect(supervisor.launch(longRunningStreamEntryPoint, [-1]), matcher);
       }
+    });
+
+    test('Reset while performing tasks', () async
+    {
+      await supervisor?.dispose();
+      supervisor = IsolateSupervisor();
+
+      final computes = [
+        for (int i = 0; i < count; ++i) supervisor.compute(defaultEntryPoint)
+      ];
+
+      await computes[0];
+      await supervisor.reset();
+
+      expect(Future.wait(computes), completion(containsAllInOrder([42, null])));
+      await supervisor?.dispose();
+    });
+
+    test('Dispose while performing tasks', () async
+    {
+      await supervisor?.dispose();
+      supervisor = IsolateSupervisor();
+ 
+      final computes = [
+        for (int i = 0; i < count; ++i) supervisor.compute(defaultEntryPoint)
+      ];
+
+      await computes[0];
+      await supervisor.dispose();
+
+      expect(Future.wait(computes), completion(containsAllInOrder([42, null])));
+      await supervisor?.dispose();
     });
   });
 }

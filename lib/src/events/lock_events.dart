@@ -1,6 +1,6 @@
-part of 'isolate_event.dart';
+part of 'events.dart';
 
-abstract class IsolateLockEvent extends IsolateEvent
+abstract class IsolateLockEvent extends _IsolateEvent
 {
   final String name;
 
@@ -11,6 +11,15 @@ abstract class IsolateLockEvent extends IsolateEvent
 
   factory IsolateLockEvent.release(Capability capability, String name) = 
     IsolateLockReleaseEvent;
+
+  @override
+  int get hashCode => hash([this.name, this.capability]);
+
+  @override
+  bool operator ==(Object other) =>
+    identical(this, other) ||
+    other is IsolateLockEvent && 
+    this.capability == other.capability && this.name == other.name;
 }
 
 class IsolateLockAcquireEvent extends IsolateLockEvent

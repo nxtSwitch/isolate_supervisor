@@ -1,6 +1,6 @@
 name: isolate_supervisor
 
-version: 1.0.1
+version: 1.0.2
 homepage: https://github.com/nxtSwitch/isolate_supervisor
 repository: https://github.com/nxtSwitch/isolate_supervisor
 description: This library constructs higher-level isolate interfaces on top of the lower level dart:isolate library.
@@ -9,5 +9,5 @@ environment:
   sdk: '>=2.7.0 <3.0.0'
 
 dev_dependencies:
-  test: ^1.6.0
-  pedantic: ^1.8.0
+  test: ^1.14.6
+  pedantic: ^1.9.0

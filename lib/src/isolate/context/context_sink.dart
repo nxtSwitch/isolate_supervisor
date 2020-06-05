@@ -1,4 +1,4 @@
-part of 'isolate_wrapper.dart';
+part of './../isolate_worker.dart';
 
 class _IsolateSink<R> implements IsolateSink<R>
 {
@@ -7,7 +7,7 @@ class _IsolateSink<R> implements IsolateSink<R>
 
   _IsolateSink._(this._sendPort, this._capability);
 
-  _IsolateSink.of(_IsolateContext<R> context) : 
+  _IsolateSink.of(WorkerContext<R> context) : 
     this._(context._sendPort, context._task.capability);
 
   @override
